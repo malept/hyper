@@ -4,10 +4,10 @@ extern crate env_logger;
 
 use hyper::server::{Request, Response};
 
-//static PHRASE: &'static [u8] = b"Hello World!";
+static PHRASE: &'static [u8] = b"Hello World!";
 
-fn hello(_: Request, _res: Response) {
-    //res.send(PHRASE)
+fn hello(_: Request, res: Response) {
+    res.send(PHRASE)
 }
 
 fn main() {

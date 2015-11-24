@@ -16,6 +16,7 @@ httparse = "1.0"
 language-tags = "0.2"
 log = "0.3"
 mime = "0.1"
+mio = "0.5"
 num_cpus = "0.2"
 rustc-serialize = "0.3"
 time = "0.1"
@@ -28,15 +29,8 @@ url = "0.5"
 version = "0.2"
 default-features = false
 
-[dependencies.eventual]
-git = "https://github.com/carllerche/eventual"
-
-[dependencies.mio]
-git = "https://github.com/carllerche/mio"
-
 [dependencies.tick]
-path = "../tick"
-#git = "https://github.com/seanmonstar/tick"
+git = "https://github.com/seanmonstar/tick"
 
 [dependencies.openssl]
 version = "0.7"
@@ -47,18 +41,14 @@ version = "0.4"
 default-features = false
 
 [dependencies.serde]
-version = "*"
+version = "0.6"
 optional = true
 
 [dev-dependencies]
-env_logger = "*"
+env_logger = "0.3"
 
 [features]
 default = []
 ssl = ["openssl", "cookie/secure"]
 serde-serialization = ["serde"]
-<<<<<<< HEAD
-=======
-timeouts = []
->>>>>>> mio wip
 nightly = []

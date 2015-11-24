@@ -2,7 +2,7 @@
 use std::marker::PhantomData;
 use std::io::{self, Write};
 
-use std::time::Duration;
+//use std::time::Duration;
 
 use url::Url;
 
@@ -79,22 +79,21 @@ pub fn new(method: method::Method, url: Url, body: http::OutgoingStream<http::Re
 impl Request<Fresh> {
     /// Consume a Fresh Request, writing the headers and method,
     /// returning a Streaming Request.
-    pub fn start(mut self) -> Request<Streaming> {
-        unimplemented!()
-        /*
-        let mut headers = self.headers;
+    pub fn start<F>(self, callback: F) where F: FnOnce(::Result<Request<Streaming>>) + Send + 'static {
+        let headers = self.headers;
         let method = self.method;
         let url = self.url;
+        let version = self.version;
 
-        let body = self.body.start(&method, &url, &mut headers);
-        Request {
-            method: method,
-            headers: headers,
-            url: url,
-            version: self.version,
-            body: body,
-        }
-        */
+        self.body.start(method, url, headers, move |result| {
+            callback(result.map(move |(method, url, headers, body)| Request {
+                method: method,
+                headers: headers,
+                url: url,
+                version: version,
+                body: body
+            }))
+        })
     }
 
     /// Get a mutable reference to the Request headers.
@@ -103,21 +102,21 @@ impl Request<Fresh> {
 }
 
 impl Request<Streaming> {
-    /*
     /// Completes writing the request, and returns a response to read from.
     ///
     /// Consumes the Request.
-    pub fn send(self) -> ::Result<Response> {
-        Response::with_message(self.url, self.message)
+    pub fn response<F>(self, callback: F) where F: FnOnce(::Result<Response>) + Send + 'static {
+        unimplemented!()
     }
 
-
-    pub fn write(&mut self, data: &[u8]) {
-        self.body.write(data);
+    pub fn write_all<T, F>(self, data: T, callback: F)
+    where T: AsRef<[u8]> + Send + 'static, F: FnOnce(::Result<Request<Streaming>>) + Send + 'static {
+        let stream = self.body.clone();
+        stream.write(::http::events::WriteAll::new(data, move |result| {
+            callback(result.map(move |_| self))
+        }));
     }
-    */
 
-    // fn drain()
 }
 
 #[cfg(test)]

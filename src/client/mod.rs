@@ -247,19 +247,31 @@ impl<'a, C: NetworkConnector> RequestBuilder<'a, C> {
 
     /// Execute this request and receive a Response back.
     pub fn send<F>(self, cb: F) where F: FnOnce(::Result<Response>) + Send + 'static {
-        let req = match self.request() {
-            Ok(req) => req,
-            Err(e) => {
-                cb(Err(e));
-                return;
+        self.connect(move |result| {
+            match result {
+                Ok(request) => request.start(move |result| {
+                    match result {
+                        Ok(request) => request.response(cb),
+                        Err(e) => cb(Err(e))
+                    }
+                }),
+                Err(e) => cb(Err(e))
             }
-        };
-
-        let streaming = req.start();
-        //streaming.send(cb);
+        })
     }
 
-    fn request(self) -> ::Result<Request<Fresh>> {
+    fn connect<F>(self, callback: F) where F: FnOnce(::Result<Request<Fresh>>) + Send + 'static {
+        match self.try_connect() {
+            Ok(_) => (),
+            Err(e) => return callback(Err(e))
+        }
+        //let mut req = try!(request::new(method, url, transfer));
+        //req.headers_mut().extend(headers);
+        //Ok(req)
+        unimplemented!()
+    }
+
+    fn try_connect(self) -> ::Result<()> {
         let RequestBuilder { client, method, url, headers } = self;
         let url = try!(url);
         trace!("send {:?} {:?}", method, url);
@@ -274,12 +286,9 @@ impl<'a, C: NetworkConnector> RequestBuilder<'a, C> {
             // transfer.start(method, url, headers)
             try!(client.connector.connect(&host, port, &*url.scheme))
         };
-        //let id = try!(client.tick.stream(transport));
-        //let mut req = try!(request::new(method, url, transfer));
-        //req.headers_mut().extend(headers);
-        //Ok(req)
-
         unimplemented!()
+        //let id = try!(client.tick.stream(transport));
+        //Ok((id, method, url, headers))
     }
 
     /*

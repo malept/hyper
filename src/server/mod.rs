@@ -144,7 +144,7 @@ pub struct Server<T: TryAccept + Evented> {
     timeouts: Timeouts,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 struct Timeouts {
     read: Option<Duration>,
     write: Option<Duration>,

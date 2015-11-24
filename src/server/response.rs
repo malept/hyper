@@ -96,19 +96,12 @@ impl Response<Fresh> {
     #[inline]
     pub fn status_mut(&mut self) -> &mut status::StatusCode { &mut self.inner.status }
 
+    /// Write the headers of the response.
+    #[inline]
     pub fn start<F>(self, callback: F) where F: FnOnce(::Result<Response<Streaming>>) + Send + 'static {
-        let inner = self.deconstruct();
-        inner.stream.start(inner.version, inner.status, inner.headers, move |result| {
-            callback(result.map(|(version, status, headers, stream)| Response {
-                inner: Inner {
-                    status: status,
-                    version: version,
-                    headers: headers,
-                    stream: stream
-                },
-            }));
-        });
+        self.start_inner(None::<&'static [u8]>, callback)
     }
+
     /// Writes the body and ends the response.
     ///
     /// This is a shortcut method for when you have a response with a fixed
@@ -132,55 +125,47 @@ impl Response<Fresh> {
     /// fn handler(mut res: Response) {
     ///     let body = b"Hello World!";
     ///     res.headers_mut().set(ContentLength(body.len() as u64));
-    ///     res.start().write(body);
+    ///     res.write(body, |_| ());
     /// }
     /// ```
     #[inline]
     pub fn send<T>(mut self, data: T) where T: AsRef<[u8]> + Send + 'static {
         self.inner.headers.set(header::ContentLength(data.as_ref().len() as u64));
-        self.start(move |result| {
-            trace!("send on_complete");
-            match result {
-                Ok(streaming) => streaming.write_all(data, |_| ()),
-                Err(e) => error!("error starting request: {:?}", e)
-            }
-        });
+        self.start_inner(Some(data), |_| ())
     }
 
-    /*
-    /// Consume this Response<Fresh>, writing the Headers and Status and
-    /// creating a Response<Streaming>
-    pub fn start(self) -> Response<Streaming> {
-        let (version, body, status, mut headers) = self.deconstruct();
-        let body = body.start(version, status, &mut headers);
-        Response {
-            version: version,
-            status: status,
-            headers: headers,
-            body: body
-        }
+    /// Write the headers, and all of the provided data.
+    #[inline]
+    pub fn write<T, F>(self, data: T, callback: F)
+    where T: AsRef<[u8]> + Send + 'static, F: FnOnce(::Result<Response<Streaming>>) + Send + 'static {
+        self.start_inner(Some(data), callback);
     }
-    */
+
+    fn start_inner<T, F>(self, chunk: Option<T>, callback: F)
+    where T: AsRef<[u8]> + Send + 'static, F: FnOnce(::Result<Response<Streaming>>) + Send + 'static {
+        let inner = self.deconstruct();
+        inner.stream.start(inner.version, inner.status, inner.headers, chunk, move |result| {
+            callback(result.map(|(version, status, headers, stream)| Response {
+                inner: Inner {
+                    status: status,
+                    version: version,
+                    headers: headers,
+                    stream: stream
+                },
+            }));
+        });
+    }
 }
 
 impl Response<Streaming> {
-    pub fn write_all<T, F>(self, data: T, callback: F)
+    /// Write all of the provided data.
+    pub fn write<T, F>(self, data: T, callback: F)
     where T: AsRef<[u8]> + Send + 'static, F: FnOnce(::Result<Response<Streaming>>) + Send + 'static {
         let stream = self.inner.stream.clone();
         stream.write(::http::events::WriteAll::new(data, move |result| {
             callback(result.map(move |_| self))
         }));
     }
-    /*
-    /// Asynchronously write bytes to the response.
-    #[inline]
-    pub fn write(&mut self, data: &[u8]) {
-        self.stream.write(data)
-    }
-    */
-
-    //pub fn drain(&mut self, callback: F) -> Future {}
-
 }
 
 impl<T: Any> Drop for Response<T> {
@@ -194,7 +179,7 @@ impl<T: Any> Drop for Response<T> {
             me.inner.headers.set(header::ContentLength(0));
             let headers = mem::replace(&mut me.inner.headers, header::Headers::new());
             let body = me.inner.stream.clone();
-            body.start(me.inner.version, me.inner.status, headers, |_| ());
+            body.start(me.inner.version, me.inner.status, headers, None::<&'static [u8]>, |_| ());
         }
 
         /*

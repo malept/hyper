@@ -10,8 +10,6 @@ use tick::{Evented, Transport};
 #[cfg(feature = "openssl")]
 pub use self::openssl::Openssl;
 
-use std::time::Duration;
-
 /// The write-status indicating headers have not been written.
 pub enum Fresh {}
 

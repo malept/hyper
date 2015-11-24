@@ -160,7 +160,7 @@ impl<T: Transport, H: Handler> Protocol<T> for Conn<T, H> {
 
     fn on_writable(&mut self, transport: &mut T) -> io::Result<tick::Interest> {
         match self.state {
-            State::Parsing(..) => trace!("on_writable State::Parsing"),
+            State::Parsing => trace!("on_writable State::Parsing"),
             State::Http1 { ref mut outgoing, .. } => {
                 try!(outgoing.on_write(transport));
             },

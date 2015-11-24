@@ -184,10 +184,14 @@ pub fn outgoing<T, S>(transfer: tick::Transfer, keep_alive: bool) -> (OutgoingSt
 const AVERAGE_HEADER_SIZE: usize = 100;
 
 impl OutgoingStream<http::Response, Fresh> {
-    pub fn start<F>(mut self, version: HttpVersion, status: StatusCode, mut headers: Headers, callback: F)
-    where F: FnOnce(::Result<(HttpVersion, StatusCode, Headers, OutgoingStream<http::Response, Streaming>)>) + Send + 'static {
+    pub fn start<T, F>(mut self, version: HttpVersion, status: StatusCode,
+                    mut headers: Headers, chunk: Option<T>, callback: F)
+    where F: FnOnce(::Result<(HttpVersion, StatusCode, Headers, OutgoingStream<http::Response, Streaming>)>) + Send + 'static,
+    T: AsRef<[u8]> + Send + 'static {
         debug!("writing head: {:?} {:?}", version, status);
-        let mut buf = Vec::with_capacity(30 + headers.len() * AVERAGE_HEADER_SIZE);
+        let init_cap = 30 + headers.len() * AVERAGE_HEADER_SIZE +
+            chunk.as_ref().map(|c| c.as_ref().len()).unwrap_or(0);
+        let mut buf = Vec::with_capacity(init_cap);
         let _ = write!(&mut buf, "{} {}\r\n", version, status);
 
         if !headers.has::<header::Date>() {
@@ -219,10 +223,14 @@ impl OutgoingStream<http::Response, Fresh> {
         debug!("{:#?}", headers);
         let _ = write!(&mut buf, "{}\r\n", headers);
 
-        let encoder = match body {
+        let mut encoder = match body {
             Body::Sized(len) => Encoder::Length(len),
             Body::Chunked => Encoder::Chunked
         };
+
+        if let Some(data) = chunk {
+            let _ = encoder.encode(&mut buf, data.as_ref());
+        }
 
         let on_write = self.on_write.clone();
         let transfer = self.transfer.clone();
@@ -334,7 +342,7 @@ impl<T> OutgoingStream<T, Streaming> {
     pub fn write<E: events::Write + Send + 'static>(mut self, on_write: E) {
         self.set_write(WriteMsg {
             callback: Box::new(on_write),
-            encoder: None 
+            encoder: None
         });
     }
 }

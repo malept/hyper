@@ -43,7 +43,7 @@ fn echo(req: Request, res: Response<Streaming>) {
     req.read(move |result| {
         match result {
             Ok((data, req)) => {
-                res.write_all(data, move |result| {
+                res.write(data, move |result| {
                     match result {
                         Ok(res) => echo(req, res),
                         Err(e) => println!("write error: {:?}", e)

@@ -1,6 +1,4 @@
 //! Client Responses
-use std::io::{self, Read};
-
 use url::Url;
 
 use header;
@@ -63,6 +61,17 @@ impl Response {
         self.body.read(Box::new(r));
     }
     */
+
+    pub fn on_read<T: ::http::Read + Send + 'static>(self, callback: T) {
+        self.body.read(callback);
+    }
+
+    pub fn read<F>(self, callback: F) where F: FnOnce(::Result<(&[u8], Self)>) + Send + 'static {
+        let stream = self.body.clone();
+        stream.read(::http::events::ReadOnce::new(move |result| {
+            callback(result.map(move |data| (data, self)))
+        }));
+    }
 }
 
 /*
